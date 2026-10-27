@@ -13,7 +13,10 @@ export type FlashSaleErrorCode =
   | "INVALID_QUANTITY"
   | "PRODUCT_NOT_FOUND"
   | "VERSION_CONFLICT"
-  | "OUT_OF_STOCK";
+  | "OUT_OF_STOCK"
+  | "RESERVATION_NOT_FOUND"
+  | "RESERVATION_EXPIRED"
+  | "RESERVATION_ALREADY_FINALIZED";
 
 export class FlashSaleError extends Error {
   constructor(
@@ -121,6 +124,38 @@ export function createFlashSaleService(
       sweepDueReservations();
       const reservation = reservations.get(reservationId);
       return reservation ? { ...reservation } : undefined;
+    },
+
+    checkout(reservationId) {
+      sweepDueReservations();
+      const reservation = reservations.get(reservationId);
+      if (!reservation) {
+        throw new FlashSaleError("RESERVATION_NOT_FOUND", "Reservation was not found");
+      }
+      if (reservation.status === "EXPIRED") {
+        throw new FlashSaleError("RESERVATION_EXPIRED", "Reservation has expired");
+      }
+      if (reservation.status !== "RESERVED") {
+        throw new FlashSaleError(
+          "RESERVATION_ALREADY_FINALIZED",
+          "Reservation has already been finalized"
+        );
+      }
+
+      const product = products.get(reservation.productId);
+      if (!product) {
+        throw new FlashSaleError("PRODUCT_NOT_FOUND", "Product was not found");
+      }
+      const timer = reservationTimers.get(reservation.id);
+      if (timer) {
+        clearTimeout(timer);
+        reservationTimers.delete(reservation.id);
+      }
+      product.reserved -= reservation.quantity;
+      product.sold += reservation.quantity;
+      product.version += 1;
+      reservation.status = "CHECKED_OUT";
+      return { ...reservation };
     }
   };
 }
