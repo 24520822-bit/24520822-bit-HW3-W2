@@ -8,6 +8,8 @@ import {
 
 export const DEFAULT_RESERVATION_TTL_MS = 300_000;
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
+const MAX_TERMINAL_RESERVATIONS = 10_000;
+const TERMINAL_QUEUE_COMPACT_THRESHOLD = 1_024;
 
 export type FlashSaleErrorCode =
   | "INVALID_QUANTITY"
@@ -45,7 +47,30 @@ export function createFlashSaleService(
     (options.products ?? createSampleProducts()).map((product) => [product.id, { ...product }])
   );
   const reservations = new Map<string, Reservation>();
+  const activeReservations = new Map<string, Reservation>();
   const reservationTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const terminalReservationIds: string[] = [];
+  let terminalQueueHead = 0;
+
+  function retainTerminalReservation(reservation: Reservation): void {
+    activeReservations.delete(reservation.id);
+    reservations.delete(reservation.id);
+    reservations.set(reservation.id, reservation);
+    terminalReservationIds.push(reservation.id);
+
+    while (terminalReservationIds.length - terminalQueueHead > MAX_TERMINAL_RESERVATIONS) {
+      reservations.delete(terminalReservationIds[terminalQueueHead]);
+      terminalQueueHead += 1;
+    }
+
+    if (
+      terminalQueueHead >= TERMINAL_QUEUE_COMPACT_THRESHOLD
+      && terminalQueueHead * 2 >= terminalReservationIds.length
+    ) {
+      terminalReservationIds.splice(0, terminalQueueHead);
+      terminalQueueHead = 0;
+    }
+  }
 
   function expireReservation(reservation: Reservation): void {
     if (reservation.status !== "RESERVED" || Date.now() < reservation.expiresAt) {
@@ -66,10 +91,11 @@ export function createFlashSaleService(
     product.available += reservation.quantity;
     product.version += 1;
     reservation.status = "EXPIRED";
+    retainTerminalReservation(reservation);
   }
 
   function sweepDueReservations(): void {
-    for (const reservation of reservations.values()) {
+    for (const reservation of activeReservations.values()) {
       expireReservation(reservation);
     }
   }
@@ -111,6 +137,7 @@ export function createFlashSaleService(
       product.reserved += quantity;
       product.version += 1;
       reservations.set(reservation.id, reservation);
+      activeReservations.set(reservation.id, reservation);
       const timer = setTimeout(() => {
         reservationTimers.delete(reservation.id);
         expireReservation(reservation);
@@ -155,6 +182,7 @@ export function createFlashSaleService(
       product.sold += reservation.quantity;
       product.version += 1;
       reservation.status = "CHECKED_OUT";
+      retainTerminalReservation(reservation);
       return { ...reservation };
     }
   };

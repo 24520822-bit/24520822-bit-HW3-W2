@@ -43,6 +43,7 @@ function createRoot(): HTMLElement {
 afterEach(() => {
   cleanup?.();
   cleanup = undefined;
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   document.body.replaceChildren();
 });
@@ -192,3 +193,74 @@ it("does not render inventory after the app has been unmounted", async () => {
 
   expect(root.querySelector(".product-card")).toBeNull();
 });
+
+it.each(["temporary API failure", "server deadline not reached"] as const)(
+  "backs off instead of scheduling more zero-time frames after %s",
+  async (scenario) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    let nextFrameId = 1;
+    const frames = new Map<number, FrameRequestCallback>();
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      const id = nextFrameId;
+      nextFrameId += 1;
+      frames.set(id, callback);
+      return id;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
+
+    const reservation: Reservation = {
+      ...createReservation(`reservation-${scenario.replaceAll(" ", "-")}`),
+      expiresAt: 9_999
+    };
+    let inventory = [initialProduct];
+    let expiryChecks = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/products") {
+        return response(inventory);
+      }
+      if (url === "/api/reservations" && init?.method === "POST") {
+        inventory = [{ ...initialProduct, available: 0, reserved: 1, version: 1 }];
+        return response(reservation, 201);
+      }
+      if (url === `/api/reservations/${reservation.id}`) {
+        expiryChecks += 1;
+        if (scenario === "temporary API failure") {
+          return response({ error: "UNAVAILABLE", message: "Temporary error" }, 503);
+        }
+        return response(reservation);
+      }
+      return response({ error: "NOT_FOUND", message: "Not found" }, 404);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const root = createRoot();
+    cleanup = mountFlashSaleApp(root);
+    await vi.waitFor(() => expect(root.querySelector('[data-action="reserve"]')).not.toBeNull());
+    root.querySelector<HTMLButtonElement>('[data-action="reserve"]')?.click();
+    await vi.waitFor(() => expect(frames.size).toBe(1));
+
+    const [frameId, frameCallback] = frames.entries().next().value as [number, FrameRequestCallback];
+    frames.delete(frameId);
+    frameCallback(Date.now());
+    for (let turn = 0; turn < 50; turn += 1) {
+      await Promise.resolve();
+    }
+
+    expect(expiryChecks).toBe(1);
+    const expectedMessage = scenario === "temporary API failure"
+      ? "Temporary error"
+      : "Sale server has not reached the lock deadline; checking again shortly.";
+    expect(root.textContent).toContain(expectedMessage);
+    expect(frames.size).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(999);
+    expect(expiryChecks).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    for (let turn = 0; turn < 50; turn += 1) {
+      await Promise.resolve();
+    }
+    expect(expiryChecks).toBe(2);
+    expect(frames.size).toBe(0);
+  }
+);

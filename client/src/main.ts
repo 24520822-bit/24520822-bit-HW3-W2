@@ -67,11 +67,37 @@ export function mountFlashSaleApp(root: HTMLElement): () => void {
   const reservations = new Map<string, Reservation>();
   const busyProducts = new Set<string>();
   const countdownCleanups = new Map<string, () => void>();
+  const expirySyncPending = new Set<string>();
+  const expiryRetryAttempts = new Map<string, number>();
+  const expiryRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   let message: StatusMessage = { text: "Loading live inventory…", isError: false };
   let destroyed = false;
 
   function setMessage(text: string, isError = false): void {
     message = { text, isError };
+  }
+
+  function clearExpiryRetry(reservationId: string): void {
+    const timer = expiryRetryTimers.get(reservationId);
+    if (timer) {
+      clearTimeout(timer);
+      expiryRetryTimers.delete(reservationId);
+    }
+    expiryRetryAttempts.delete(reservationId);
+  }
+
+  function scheduleExpiryRetry(reservationId: string): void {
+    if (destroyed || expiryRetryTimers.has(reservationId)) {
+      return;
+    }
+    const attempt = (expiryRetryAttempts.get(reservationId) ?? 0) + 1;
+    expiryRetryAttempts.set(reservationId, attempt);
+    const delayMs = Math.min(1_000 * 2 ** (attempt - 1), 30_000);
+    const timer = setTimeout(() => {
+      expiryRetryTimers.delete(reservationId);
+      void syncReservation(reservationId);
+    }, delayMs);
+    expiryRetryTimers.set(reservationId, timer);
   }
 
   function render(): void {
@@ -217,7 +243,7 @@ export function mountFlashSaleApp(root: HTMLElement): () => void {
     root.replaceChildren(hero, feedback, inventorySection, reservationSection);
 
     for (const reservation of reservations.values()) {
-      if (reservation.status !== "RESERVED") {
+      if (reservation.status !== "RESERVED" || expirySyncPending.has(reservation.id)) {
         continue;
       }
       const countdown = Array.from(root.querySelectorAll<HTMLElement>('[data-role="countdown"]'))
@@ -230,6 +256,8 @@ export function mountFlashSaleApp(root: HTMLElement): () => void {
         countdown.textContent = formatCountdown(remainingMs);
         if (remainingMs === 0 && !expirySyncStarted) {
           expirySyncStarted = true;
+          expirySyncPending.add(reservation.id);
+          setMessage("Checking the sale server for the reservation's final status…");
           void syncReservation(reservation.id);
         }
       });
@@ -246,12 +274,22 @@ export function mountFlashSaleApp(root: HTMLElement): () => void {
       const reservation = await fetchReservation(reservationId);
       reservations.set(reservation.id, reservation);
       await refreshInventory();
+      if (reservation.status === "RESERVED") {
+        expirySyncPending.add(reservationId);
+        setMessage("Sale server has not reached the lock deadline; checking again shortly.");
+        scheduleExpiryRetry(reservationId);
+      } else {
+        expirySyncPending.delete(reservationId);
+        clearExpiryRetry(reservationId);
+      }
       if (!destroyed) {
         render();
       }
     } catch (error) {
       if (!destroyed) {
+        expirySyncPending.add(reservationId);
         setMessage(statusMessage(error), true);
+        scheduleExpiryRetry(reservationId);
         render();
       }
     }
@@ -336,6 +374,8 @@ export function mountFlashSaleApp(root: HTMLElement): () => void {
     try {
       const checkedOut = await checkoutReservation(reservationId);
       reservations.set(checkedOut.id, checkedOut);
+      expirySyncPending.delete(reservationId);
+      clearExpiryRetry(reservationId);
       setMessage("Checkout complete. Your units are now sold.");
       await refreshInventory();
     } catch (error) {
@@ -344,6 +384,10 @@ export function mountFlashSaleApp(root: HTMLElement): () => void {
       try {
         latest = await fetchReservation(reservationId);
         reservations.set(latest.id, latest);
+        if (latest.status !== "RESERVED") {
+          expirySyncPending.delete(reservationId);
+          clearExpiryRetry(reservationId);
+        }
         await refreshInventory();
       } catch (followUpError) {
         refreshError = followUpError;
@@ -402,5 +446,11 @@ export function mountFlashSaleApp(root: HTMLElement): () => void {
       cleanup();
     }
     countdownCleanups.clear();
+    for (const timer of expiryRetryTimers.values()) {
+      clearTimeout(timer);
+    }
+    expiryRetryTimers.clear();
+    expiryRetryAttempts.clear();
+    expirySyncPending.clear();
   };
 }

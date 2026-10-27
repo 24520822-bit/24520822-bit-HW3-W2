@@ -47,6 +47,8 @@ The supported timer range is 1–2,147,483,647 milliseconds. Invalid values stop
 
 The buyer-race control submits multiple requests using the same product version. A successful request increments that version; other requests with the stale version receive a conflict instead of overselling stock.
 
+After a displayed countdown reaches zero, the browser checks the server for the final state. Temporary failures or client/server clock skew are retried with bounded exponential backoff rather than a per-frame request loop. The service sweeps only active reservations and retains the most recent 10,000 terminal reservation records; older terminal IDs return `404`.
+
 ## Verification
 
 ```powershell

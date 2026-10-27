@@ -25,3 +25,19 @@ This audit records concrete implementation mistakes an AI coding assistant could
 **Concrete impact:** Repeated releases inflate available inventory; a late callback can corrupt the stock totals after an order has been confirmed.
 
 **Safeguard:** Reservations transition only from `RESERVED` to `EXPIRED` or `CHECKED_OUT`. Terminal states are not transitioned again, overdue locks are swept before inventory-changing operations, and checkout cancels the expiry timer. Fake-clock tests cover the exact deadline, a delayed callback, repeated expiry reads, expired checkout, and repeated checkout.
+
+## 4. Polling continuously after a zero-time sync failure
+
+**Failure mode:** Recreate an already-expired animation-frame timer after a status request fails or the browser clock is ahead of the server.
+
+**Concrete impact:** Each frame can trigger another reservation lookup and inventory request, producing sustained API load while the tab remains open.
+
+**Safeguard:** The client marks that reservation as awaiting authoritative expiry and retries its status with exponential backoff capped at 30 seconds. UI tests exercise both a temporary API failure and a server response that still reports `RESERVED`, verifying that zero-time frames stop.
+
+## 5. Sweeping and retaining every historical reservation
+
+**Failure mode:** Scan all terminal reservations on every inventory request and keep every completed record forever.
+
+**Concrete impact:** An otherwise healthy sale becomes progressively slower and consumes unbounded process memory as reservation turnover grows.
+
+**Safeguard:** Expiry sweeps visit only active reservations; a bounded FIFO keeps the latest 10,000 terminal records and evicts older IDs. A turnover regression test verifies eviction and preserved inventory totals.
