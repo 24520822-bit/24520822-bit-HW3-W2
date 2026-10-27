@@ -24,7 +24,6 @@ export interface FlashSaleService {
   getProducts(): Product[];
   reserve(productId: string, quantity: number, expectedVersion: number): Reservation;
   getReservation(reservationId: string): Reservation | undefined;
-  checkout(reservationId: string): Reservation;
 }
 
 export function createSampleProducts(): Product[] {
