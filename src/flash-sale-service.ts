@@ -7,6 +7,7 @@ import {
 } from "./domain";
 
 export const DEFAULT_RESERVATION_TTL_MS = 300_000;
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 export type FlashSaleErrorCode =
   | "INVALID_QUANTITY"
@@ -26,18 +27,53 @@ export class FlashSaleError extends Error {
 
 export interface FlashSaleServiceOptions {
   products?: Product[];
+  ttlMs?: number;
 }
 
 export function createFlashSaleService(
   options: FlashSaleServiceOptions = {}
 ): FlashSaleService {
+  const ttlMs = options.ttlMs ?? DEFAULT_RESERVATION_TTL_MS;
+  if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0 || ttlMs > MAX_TIMER_DELAY_MS) {
+    throw new RangeError(`ttlMs must be an integer between 1 and ${MAX_TIMER_DELAY_MS}`);
+  }
+
   const products = new Map(
     (options.products ?? createSampleProducts()).map((product) => [product.id, { ...product }])
   );
   const reservations = new Map<string, Reservation>();
+  const reservationTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  function expireReservation(reservation: Reservation): void {
+    if (reservation.status !== "RESERVED" || Date.now() < reservation.expiresAt) {
+      return;
+    }
+
+    const product = products.get(reservation.productId);
+    if (!product) {
+      return;
+    }
+
+    const timer = reservationTimers.get(reservation.id);
+    if (timer) {
+      clearTimeout(timer);
+      reservationTimers.delete(reservation.id);
+    }
+    product.reserved -= reservation.quantity;
+    product.available += reservation.quantity;
+    product.version += 1;
+    reservation.status = "EXPIRED";
+  }
+
+  function sweepDueReservations(): void {
+    for (const reservation of reservations.values()) {
+      expireReservation(reservation);
+    }
+  }
 
   return {
     getProducts() {
+      sweepDueReservations();
       return [...products.values()].map((product) => ({ ...product }));
     },
 
@@ -50,6 +86,7 @@ export function createFlashSaleService(
       if (!product) {
         throw new FlashSaleError("PRODUCT_NOT_FOUND", "Product was not found");
       }
+      sweepDueReservations();
       if (product.version !== expectedVersion) {
         throw new FlashSaleError("VERSION_CONFLICT", "Inventory changed; refresh and try again");
       }
@@ -64,17 +101,24 @@ export function createFlashSaleService(
         quantity,
         status: "RESERVED",
         createdAt,
-        expiresAt: createdAt + DEFAULT_RESERVATION_TTL_MS
+        expiresAt: createdAt + ttlMs
       };
 
       product.available -= quantity;
       product.reserved += quantity;
       product.version += 1;
       reservations.set(reservation.id, reservation);
+      const timer = setTimeout(() => {
+        reservationTimers.delete(reservation.id);
+        expireReservation(reservation);
+      }, ttlMs);
+      timer.unref();
+      reservationTimers.set(reservation.id, timer);
       return { ...reservation };
     },
 
     getReservation(reservationId) {
+      sweepDueReservations();
       const reservation = reservations.get(reservationId);
       return reservation ? { ...reservation } : undefined;
     }
