@@ -5,7 +5,11 @@ import {
 } from "node:http";
 import { pathToFileURL } from "node:url";
 import type { FlashSaleService } from "./domain";
-import { createFlashSaleService, FlashSaleError } from "./flash-sale-service";
+import {
+  createFlashSaleService,
+  DEFAULT_RESERVATION_TTL_MS,
+  FlashSaleError
+} from "./flash-sale-service";
 
 const MAX_REQUEST_BODY_BYTES = 16_384;
 
@@ -161,7 +165,14 @@ async function handleRequest(
   response.end("Not found");
 }
 
-export function createServer(service: FlashSaleService = createFlashSaleService()) {
+export function createDefaultService(
+  ttlSetting: string | undefined = process.env.RESERVATION_TTL_MS
+): FlashSaleService {
+  const ttlMs = ttlSetting === undefined ? DEFAULT_RESERVATION_TTL_MS : Number(ttlSetting);
+  return createFlashSaleService({ ttlMs });
+}
+
+export function createServer(service: FlashSaleService = createDefaultService()) {
   return createHttpServer((request, response) => {
     void handleRequest(request, response, service).catch((error: unknown) => {
       console.error("Unhandled API request error", error);
