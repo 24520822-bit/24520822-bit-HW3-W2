@@ -1,0 +1,396 @@
+:root {
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  color: #f7f7f4;
+  background: #101210;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-weight: 400;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(ellipse at 86% 0, rgb(209 60 41 / 22%), transparent 34rem),
+    radial-gradient(ellipse at 0 42%, rgb(208 143 42 / 9%), transparent 30rem),
+    #101210;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 48px 0 72px;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 270px;
+  padding: clamp(30px, 6vw, 64px);
+  border: 1px solid #34362f;
+  border-radius: 24px;
+  background:
+    linear-gradient(110deg, rgb(17 19 17 / 96%) 8%, rgb(17 19 17 / 70%) 68%, rgb(109 39 29 / 65%)),
+    radial-gradient(circle at 88% 50%, #b74e2c, transparent 22rem);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 28%);
+}
+
+.eyebrow,
+.drop-label,
+.version-label,
+.live-pill {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  margin: 0 0 20px;
+  color: #efb95b;
+}
+
+.hero h1 {
+  max-width: 680px;
+  margin: 0;
+  font-size: clamp(38px, 7vw, 72px);
+  font-weight: 800;
+  letter-spacing: -0.07em;
+  line-height: 0.99;
+}
+
+.hero-copy {
+  max-width: 510px;
+  margin: 20px 0 0;
+  color: #b7bab1;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.live-pill {
+  position: absolute;
+  top: 28px;
+  right: 30px;
+  padding: 10px 13px;
+  border: 1px solid rgb(245 114 79 / 42%);
+  border-radius: 999px;
+  color: #ff9a79;
+  background: rgb(70 30 25 / 50%);
+}
+
+.feedback {
+  min-height: 52px;
+  margin: 18px 0 30px;
+  padding: 16px 18px;
+  border: 1px solid #3c4938;
+  border-radius: 12px;
+  color: #bfd9aa;
+  background: #1d271d;
+  font-size: 13px;
+}
+
+.feedback.error {
+  border-color: #78433a;
+  color: #ffb09c;
+  background: #2b1d1a;
+}
+
+.inventory-section,
+.reservation-section {
+  margin-top: 40px;
+}
+
+.inventory-section h2,
+.reservation-section h2 {
+  margin: 0;
+  font-size: 25px;
+  letter-spacing: -0.04em;
+}
+
+.section-copy {
+  margin: 8px 0 20px;
+  color: #959990;
+  font-size: 13px;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.product-card,
+.reservation-card {
+  border: 1px solid #33362f;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #1d201c, #171916);
+}
+
+.product-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 21px;
+}
+
+.product-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.drop-label {
+  color: #f0b251;
+}
+
+.version-label,
+.reservation-meta {
+  color: #878b83;
+  font-size: 10px;
+}
+
+.product-name {
+  min-height: 52px;
+  margin: 23px 0 5px;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.product-price {
+  margin: 0 0 18px;
+  color: #f4d18c;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.inventory-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 13px 0;
+  border-top: 1px solid #343730;
+  border-bottom: 1px solid #343730;
+}
+
+.inventory-stat dt {
+  color: #9da198;
+  font-size: 10px;
+}
+
+.inventory-stat dd {
+  margin: 5px 0 0;
+  color: #f4f4ed;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 17px;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: 0.7fr 1.3fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.field-label {
+  display: grid;
+  gap: 7px;
+  color: #a7aaa2;
+  font-size: 11px;
+}
+
+.number-input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #41443d;
+  border-radius: 8px;
+  outline: none;
+  color: #f7f7f4;
+  background: #121411;
+}
+
+.number-input:focus {
+  border-color: #e4a948;
+  box-shadow: 0 0 0 2px rgb(228 169 72 / 15%);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 0.75fr 1.25fr;
+  gap: 8px;
+  margin-top: 13px;
+}
+
+.button {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.button:hover:not(:disabled) {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.button.primary {
+  color: #1b1710;
+  background: linear-gradient(100deg, #f3c466, #e59b3a);
+}
+
+.button.secondary {
+  border-color: #4a3e2c;
+  color: #e8c783;
+  background: #29241b;
+}
+
+.reservation-list {
+  display: grid;
+  gap: 10px;
+}
+
+.reservation-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 19px;
+}
+
+.reservation-details h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.reservation-meta {
+  margin: 5px 0 0;
+  font-size: 11px;
+}
+
+.reservation-state {
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: #c9dfa9;
+  background: #2d3b28;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 10px;
+}
+
+.reservation-state.expired {
+  color: #c0c2ba;
+  background: #343630;
+}
+
+.reservation-state.checked_out {
+  color: #f1cf8a;
+  background: #403522;
+}
+
+.reservation-actions {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.countdown {
+  color: #ff9d78;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.button.compact {
+  min-height: 36px;
+}
+
+.terminal-note {
+  color: #e5c27b;
+  font-size: 12px;
+}
+
+.terminal-note.expired {
+  color: #aaa99f;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed #3b3e37;
+  border-radius: 12px;
+  color: #9fa299;
+  font-size: 13px;
+}
+
+@media (max-width: 860px) {
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 580px) {
+  .app-shell {
+    width: min(100% - 24px, 520px);
+    padding-top: 12px;
+  }
+
+  .hero {
+    min-height: 310px;
+    padding: 30px 22px;
+  }
+
+  .hero h1 {
+    margin-top: 43px;
+    font-size: 46px;
+  }
+
+  .live-pill {
+    top: 22px;
+    right: 22px;
+  }
+
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-name {
+    min-height: auto;
+  }
+
+  .reservation-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+
+  .reservation-state {
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .reservation-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    flex-direction: column;
+  }
+}
